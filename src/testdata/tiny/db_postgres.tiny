@@ -1,0 +1,33 @@
+import std "io"
+import std "db"
+import std "process"
+
+const conn = db.open("postgres", process.getEnv("TINY_DB_PG_DSN"))
+
+conn.exec("DROP TABLE IF EXISTS tiny_test_users")
+conn.exec("CREATE TABLE tiny_test_users (id SERIAL PRIMARY KEY, name TEXT, age INT)")
+
+// positional ? rebound to $N for postgres
+conn.run("INSERT INTO tiny_test_users (name, age) VALUES (?, ?)", ["Ada", 36])
+// named params -> $N
+conn.run("INSERT INTO tiny_test_users (name, age) VALUES (:name, :age)", { name: "Linus", age: 54 })
+
+const tx = conn.begin()
+tx.run("INSERT INTO tiny_test_users (name, age) VALUES (?, ?)", ["Grace", 85])
+tx.commit()
+
+// postgres has no lastInsertRowid; use RETURNING
+let created = conn.get("INSERT INTO tiny_test_users (name, age) VALUES (?, ?) RETURNING name", ["Edsger", 60])
+io.println(`returning=${created.name}`)
+
+let rows = conn.query("SELECT name, age FROM tiny_test_users WHERE age > :min ORDER BY age", { min: 40 })
+for row in rows {
+    io.println(`${row.name}=${row.age}`)
+}
+
+let n = conn.get("SELECT count(*) as c FROM tiny_test_users")
+io.println(`count=${n.c}`)
+
+conn.exec("DROP TABLE tiny_test_users")
+conn.close()
+io.println("done")

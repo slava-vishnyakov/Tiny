@@ -1,0 +1,50 @@
+import std "io"
+import std "db"
+import std "json"
+
+// The `db` module is a driver-agnostic layer over SQL databases. SQLite runs
+// with zero setup (no external server), so this example uses an in-memory
+// database. See ../postgres.tiny and ../mysql.tiny for the other drivers.
+const conn = db.open("sqlite", ":memory:")
+
+conn.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)")
+
+// run() executes a write and returns { changes, lastInsertRowid }.
+// Parameters can be positional (an array) ...
+let inserted = conn.run("INSERT INTO users (name, age) VALUES (?, ?)", ["Ada", 36])
+io.println(`inserted id=${inserted.lastInsertRowid}`)
+
+// ... or named (an object, bound by :key).
+conn.run("INSERT INTO users (name, age) VALUES (:name, :age)", { name: "Linus", age: 54 })
+
+// Transactions are explicit and roll back safely on error.
+const tx = conn.begin()
+try {
+    tx.run("INSERT INTO users (name, age) VALUES (?, ?)", ["Grace", 85])
+    tx.run("INSERT INTO users (name, age) VALUES (?, ?)", ["Edsger", 60])
+    tx.commit()
+} catch e {
+    tx.rollback()
+    io.println(`rolled back: ${e.message}`)
+}
+
+// Prepared statements are reused efficiently in a loop.
+const stmt = conn.prepare("INSERT INTO users (name, age) VALUES (?, ?)")
+for person in [["Barbara", 50], ["Alan", 41]] {
+    stmt.run(person)
+}
+stmt.close()
+
+// query() returns every matching row as an array of objects.
+let adults = conn.query("SELECT name, age FROM users WHERE age > :min ORDER BY age", { min: 45 })
+io.println(json.pretty(adults))
+
+// get() returns the first row, or null when there is no match.
+let ada = conn.get("SELECT name, age FROM users WHERE name = ?", ["Ada"])
+io.println(`${ada.name} is ${ada.age}`)
+io.println(`missing -> ${conn.get("SELECT * FROM users WHERE id = ?", [999])}`)
+
+let total = conn.get("SELECT count(*) as c FROM users")
+io.println(`total users: ${total.c}`)
+
+conn.close()

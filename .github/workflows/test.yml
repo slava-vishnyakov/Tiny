@@ -5,6 +5,34 @@ on: [push, pull_request]
 jobs:
   test-linux:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tiny
+          POSTGRES_PASSWORD: tinypass
+          POSTGRES_DB: tiny_db_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: tiny_db_test
+          MYSQL_USER: tiny
+          MYSQL_PASSWORD: tinypass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
@@ -13,6 +41,9 @@ jobs:
       - run: chmod +x build_linux.sh
       - run: ./build_linux.sh --compiler
       - run: go test ./src/...
+        env:
+          TINY_DB_PG_DSN: postgres://tiny:tinypass@127.0.0.1:5432/tiny_db_test?sslmode=disable
+          TINY_DB_MYSQL_DSN: tiny:tinypass@tcp(127.0.0.1:3306)/tiny_db_test?parseTime=true
       - run: ./tiny_linux_amd64 test.tiny
 
   test-windows:

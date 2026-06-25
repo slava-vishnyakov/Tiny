@@ -1,0 +1,47 @@
+import std "io"
+import std "db"
+
+const conn = db.open("sqlite", ":memory:")
+conn.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)")
+
+// positional params
+let r = conn.run("INSERT INTO users (name, age) VALUES (?, ?)", ["Ada", 36])
+io.println(`run rowid=${r.lastInsertRowid} changes=${r.changes}`)
+
+// named params
+conn.run("INSERT INTO users (name, age) VALUES (:name, :age)", { name: "Linus", age: 54 })
+
+// explicit transaction
+const tx = conn.begin()
+tx.run("INSERT INTO users (name, age) VALUES (?, ?)", ["Grace", 85])
+tx.commit()
+io.println("tx committed")
+
+// prepared statement
+const stmt = conn.prepare("INSERT INTO users (name, age) VALUES (?, ?)")
+stmt.run(["Edsger", 60])
+stmt.close()
+
+// query with a named param, ordered for determinism
+let rows = conn.query("SELECT name, age FROM users WHERE age > :min ORDER BY age", { min: 40 })
+for row in rows {
+    io.println(`${row.name}=${row.age}`)
+}
+
+// single-row get, plus a miss
+let one = conn.get("SELECT name FROM users WHERE name = ?", ["Ada"])
+io.println(`get=${one.name}`)
+io.println(`missing=${conn.get("SELECT * FROM users WHERE id = ?", [999])}`)
+
+let n = conn.get("SELECT count(*) as c FROM users")
+io.println(`count=${n.c}`)
+
+// errors are catchable
+try {
+    conn.query("SELECT * FROM does_not_exist")
+} catch e {
+    io.println("caught error")
+}
+
+conn.close()
+io.println("done")

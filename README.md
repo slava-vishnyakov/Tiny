@@ -360,6 +360,53 @@ Native operations for array manipulation, including `find`, `filter`, `map`, `re
 
 ---
 
+### `db` (SQL Databases)
+A driver-agnostic layer over SQL databases, modelled on `bun:sqlite`. Built-in **pure-Go** drivers for **SQLite**, **PostgreSQL**, and **MySQL** mean no CGo toolchain is required.
+
+```ts
+import std "db";
+import std "io";
+
+const conn = db.open("sqlite", ":memory:");
+// File-backed SQLite: db.open("sqlite", "app.db")
+// PostgreSQL:         db.open("postgres", "postgres://login:password@localhost:5432/mydb?sslmode=disable")
+// MySQL:              db.open("mysql", "login:password@tcp(127.0.0.1:3306)/mydb?parseTime=true")
+
+conn.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)");
+
+// Parameters may be positional (an array) or named (an object, bound by :key).
+conn.run("INSERT INTO users (name, age) VALUES (?, ?)", ["Ada", 36]);
+conn.run("INSERT INTO users (name, age) VALUES (:name, :age)", { name: "Linus", age: 54 });
+
+// query() returns every matching row; get() returns the first row, or null.
+const adults = conn.query("SELECT * FROM users WHERE age > ?", [40]);
+const ada = conn.get("SELECT * FROM users WHERE name = :name", { name: "Ada" });
+
+// Explicit, pool-safe transactions — roll back on error.
+const tx = conn.begin();
+try {
+    tx.run("UPDATE users SET age = age + 1 WHERE id = ?", [1]);
+    tx.run("INSERT INTO users (name, age) VALUES (?, ?)", ["Grace", 85]);
+    tx.commit();
+} catch e {
+    tx.rollback();
+    io.println(`transaction failed: ${e.message}`);
+}
+
+// Reusable prepared statements for hot loops.
+const stmt = conn.prepare("INSERT INTO users (name, age) VALUES (?, ?)");
+stmt.run(["Grace", 85]);
+stmt.close();
+
+conn.close();
+```
+
+`run()` returns `{ changes, lastInsertRowid }`. Positional `?` and named `:key` placeholders are automatically rebound to PostgreSQL's `$1, $2, ...` form (PostgreSQL has no `lastInsertRowid` — use `RETURNING` with `get()`). See [`examples/15-database`](https://github.com/confh/Tiny/tree/master/examples/15-database).
+
+**SQLite defaults:** file-backed databases are opened in WAL mode with a 5-second busy timeout (equivalent to appending `?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)`), which improves concurrent read/write behaviour. To control the pragmas yourself, pass a full `file:` DSN — e.g. `db.open("sqlite", "file:app.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)")` — and the defaults are left untouched. `:memory:` databases are used as-is.
+
+---
+
 ### `http` (High-Throughput Web Services)
 Fully concurrent web server and client. The server supports route-based multiplexing and optimized JSON serialization.
 

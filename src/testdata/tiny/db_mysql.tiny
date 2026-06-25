@@ -1,0 +1,34 @@
+import std "io"
+import std "db"
+import std "process"
+
+const conn = db.open("mysql", process.getEnv("TINY_DB_MYSQL_DSN"))
+
+conn.exec("DROP TABLE IF EXISTS tiny_test_users")
+conn.exec("CREATE TABLE tiny_test_users (id INT AUTO_INCREMENT PRIMARY KEY, name TEXT, age INT)")
+
+// positional params, mysql exposes lastInsertRowid
+let r = conn.run("INSERT INTO tiny_test_users (name, age) VALUES (?, ?)", ["Ada", 36])
+io.println(`run rowid=${r.lastInsertRowid}`)
+// named params -> ?
+conn.run("INSERT INTO tiny_test_users (name, age) VALUES (:name, :age)", { name: "Linus", age: 54 })
+
+const tx = conn.begin()
+tx.run("INSERT INTO tiny_test_users (name, age) VALUES (?, ?)", ["Grace", 85])
+tx.commit()
+
+const stmt = conn.prepare("INSERT INTO tiny_test_users (name, age) VALUES (?, ?)")
+stmt.run(["Edsger", 60])
+stmt.close()
+
+let rows = conn.query("SELECT name, age FROM tiny_test_users WHERE age > :min ORDER BY age", { min: 40 })
+for row in rows {
+    io.println(`${row.name}=${row.age}`)
+}
+
+let n = conn.get("SELECT count(*) as c FROM tiny_test_users")
+io.println(`count=${n.c}`)
+
+conn.exec("DROP TABLE tiny_test_users")
+conn.close()
+io.println("done")
