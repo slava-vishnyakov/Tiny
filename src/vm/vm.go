@@ -5836,6 +5836,18 @@ func (vm *VM) callMethodResolved(method string, objectValue TinyValue, args []Ti
 		vm.callNativeTimerMethod(val, method, args)
 		return
 
+	case *NativeDBValue:
+		vm.callDBMethod(val, method, args)
+		return
+
+	case *NativeTxValue:
+		vm.callTxMethod(val, method, args)
+		return
+
+	case *NativeStmtValue:
+		vm.callStmtMethod(val, method, args)
+		return
+
 	case *ArrayValue:
 		vm.callArrayMethod(val, method, args)
 		return

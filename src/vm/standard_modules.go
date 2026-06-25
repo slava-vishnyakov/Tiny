@@ -84,6 +84,9 @@ func (vm *VM) callStandardModule(module string, method string, args []TinyValue)
 	case "url":
 		vm.callStdUrl(method, args)
 
+	case "db":
+		vm.callStdDb(method, args)
+
 	default:
 		vm.fatalError(ErrorName, "unknown standard module: %s", module)
 	}

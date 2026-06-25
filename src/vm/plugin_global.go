@@ -27,4 +27,5 @@ var AvailablePlugins = []string{
 	"tray",
 	"validate",
 	"url",
+	"db",
 }
